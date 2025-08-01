@@ -1,33 +1,67 @@
 # backend/main.py
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
+from sqlalchemy.orm import Session
+from typing import List, AsyncGenerator
+from contextlib import asynccontextmanager
+
+# Import our modules
+from .app import crud, models, schemas
+from .app.database import engine, get_db, SessionLocal
 from .app.config import logger, TRADE_FILES
 from .app.data_loader import load_and_clean_trades
 
+# Create all database tables defined in models.py
+models.Base.metadata.create_all(bind=engine)
+
+# --- Lifespan Management (The new way for startup/shutdown events) ---
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """
+    Manages the application's lifespan. Code before 'yield' runs on startup.
+    Code after 'yield' runs on shutdown.
+    """
+    logger.info("Application startup: Initializing...")
+    
+    # Use a standard synchronous session for the one-off startup task
+    db = SessionLocal()
+    try:
+        # 1. Load data from files into a DataFrame
+        trades_df = load_and_clean_trades(TRADE_FILES)
+        
+        # 2. Populate the database with the DataFrame
+        if trades_df is not None and not trades_df.empty:
+            crud.populate_database(db, trades_df)
+        else:
+            logger.error("No trade data was loaded, so the database could not be populated.")
+    finally:
+        db.close()
+        
+    logger.info("Startup process complete. The application is now ready.")
+    
+    yield  # The application is now running
+    
+    # --- Shutdown logic (if any) would go here ---
+    logger.info("Application shutdown.")
+
 # --- Application Setup ---
-app = FastAPI(title="Portfolio Analyzer API")
+app = FastAPI(title="Portfolio Analyzer API", lifespan=lifespan)
 
-# --- Global State (use with caution, for demonstration here) ---
-# In a real app, this would be managed by a database connection pool.
-master_trade_data = None
-
-@app.on_event("startup")
-def startup_event():
-    """Actions to perform on application startup."""
-    global master_trade_data
-    logger.info("Application startup: Loading and cleaning trade data...")
-    master_trade_data = load_and_clean_trades(TRADE_FILES)
-    if master_trade_data is not None and not master_trade_data.empty:
-        logger.info("Trade data loaded successfully into memory.")
-        # Log the first 5 rows for verification
-        logger.info("Sample of loaded data:\n" + master_trade_data.head().to_string())
-    else:
-        logger.error("Failed to load trade data. The application might not function correctly.")
-
+# --- API Endpoints ---
 @app.get("/")
-def read_root():
-    """Root endpoint for the API."""
+def read_root(db: Session = Depends(get_db)):
+    """Root endpoint providing basic API status and DB stats."""
+    trade_count = crud.get_trade_count(db)
     return {
         "message": "Welcome to the Portfolio Analyzer API",
         "status": "ok",
-        "loaded_trades": len(master_trade_data) if master_trade_data is not None else 0
+        "database_status": "connected",
+        "total_trades_in_db": trade_count
     }
+
+@app.get("/trades", response_model=List[schemas.TradeSchema])
+def get_all_trades(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    Retrieves a list of all trades from the database with pagination.
+    """
+    trades = db.query(models.Trade).offset(skip).limit(limit).all()
+    return trades
