@@ -28,31 +28,19 @@ function App() {
 
   // Fetch portfolio value data
   useEffect(() => {
+    // Fetch portfolio value
     axios.get(`${API_URL}/analytics/portfolio-value?currency=${currency}`)
       .then(response => {
         setPortfolioValueData(response.data);
       })
       .catch(error => console.error("Error fetching portfolio value:", error));
 
-    // --- Placeholder for Holdings Data ---
-    const dummySymbols = ["NVDA", "MARA", "MSFT", "GOOG", "AAPL"];
-    const fetchHoldingsData = async () => {
-        const holdingsData = await Promise.all(
-            dummySymbols.map(async (symbol) => {
-                const xirrRes = await axios.get(`${API_URL}/analytics/xirr/${symbol}`);
-                // Dummy values for quantity and market_value
-                return {
-                    symbol: symbol,
-                    quantity: 100, // placeholder
-                    market_value: 50000, // placeholder
-                    xirr_percent: xirrRes.data.xirr_percent
-                }
-            })
-        );
-        setHoldings(holdingsData);
-    };
-    fetchHoldingsData();
-    // --- End Placeholder ---
+    // Fetch holdings data
+    axios.get(`${API_URL}/analytics/holdings`)
+        .then(response => {
+            setHoldings(response.data);
+        })
+        .catch(error => console.error("Error fetching holdings:", error));
 
   }, [currency]);
   

@@ -166,3 +166,47 @@ def calculate_xirr_for_holding(db: Session, symbol: str) -> float | None:
     except (ValueError, TypeError) as e:
         logger.error(f"Could not calculate XIRR for {symbol}: {e}")
         return None
+
+def get_current_holdings(db: Session) -> list:
+    """
+    Calculates the current quantity and market value for all holdings.
+
+    Returns:
+        A list of dictionaries, each representing a holding.
+    """
+    logger.info("Calculating current holdings...")
+    
+    # Using pandas for efficient calculation
+    trades_df = pd.read_sql(db.query(models.Trade).statement, db.bind)
+    prices_df = pd.read_sql(db.query(models.HistoricalPrice).statement, db.bind)
+
+    if trades_df.empty:
+        return []
+
+    # Get the latest price for each symbol
+    latest_prices = prices_df.loc[prices_df.groupby('Symbol')['date'].idxmax()]
+    latest_prices = latest_prices.set_index('Symbol')['close_price']
+    
+    # Calculate current quantities
+    current_quantities = trades_df.groupby('Symbol')['Quantity'].sum()
+    
+    # Filter for holdings we still own
+    holdings = current_quantities[current_quantities > 0].reset_index()
+    holdings.rename(columns={'Quantity': 'quantity'}, inplace=True)
+    
+    # Map the latest price to each holding
+    holdings['market_value'] = holdings['Symbol'].map(latest_prices) * holdings['quantity']
+    holdings.fillna({'market_value': 0}, inplace=True) # Handle case where price might be missing
+    
+    # Fetch XIRR for each holding
+    def get_xirr(symbol):
+        xirr = calculate_xirr_for_holding(db, symbol)
+        # Ensure we return a JSON-serializable float or None
+        return float(xirr) if xirr is not None else None
+
+    holdings['xirr_percent'] = holdings['Symbol'].apply(get_xirr)
+
+    # Rename for consistency with schema
+    holdings.rename(columns={'Symbol': 'symbol'}, inplace=True)
+    
+    return holdings.to_dict(orient='records')
