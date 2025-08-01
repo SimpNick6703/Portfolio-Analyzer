@@ -1,10 +1,9 @@
 # backend/app/schemas.py
 from pydantic import BaseModel, Field
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, date
+from typing import Optional, List
 
-# This Pydantic model defines the structure for a trade when interacting via the API.
-# It helps with data validation, serialization, and documentation.
+# --- Base Schemas ---
 class TradeSchema(BaseModel):
     id: int
     asset_category: str = Field(..., alias='Asset Category')
@@ -24,3 +23,13 @@ class TradeSchema(BaseModel):
     class Config:
         orm_mode = True  # Allows the model to be created from an ORM object
         allow_population_by_field_name = True
+
+# --- New Schemas for Analytics ---
+class DailyValue(BaseModel):
+    Date: date
+    PortfolioValue: float
+
+class HoldingXIRR(BaseModel):
+    symbol: str
+    xirr_percent: Optional[float] = None
+    message: Optional[str] = None
