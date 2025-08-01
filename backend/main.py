@@ -10,7 +10,7 @@ from .app.database import engine, get_db, SessionLocal
 from .app.config import logger, TRADE_FILES
 from .app.data_loader import load_and_clean_trades
 from .app.data_enricher import run_full_enrichment
-from .app.financial_calculator import get_daily_portfolio_value, calculate_xirr_for_holding
+from .app.financial_calculator import get_daily_portfolio_value, calculate_xirr_for_holding, get_current_holdings
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -71,6 +71,13 @@ def get_xirr(symbol: str, db: Session = Depends(get_db)):
     if xirr is None:
         return {"symbol": symbol.upper(), "xirr_percent": None, "message": "Could not calculate XIRR."}
     return {"symbol": symbol.upper(), "xirr_percent": xirr}
+
+@app.get("/analytics/holdings", response_model=List[schemas.Holding])
+def get_holdings_list(db: Session = Depends(get_db)):
+    """
+    Returns a list of all current holdings with their market value and XIRR.
+    """
+    return get_current_holdings(db)
 
 # --- NEW NEWS ENDPOINT ---
 @app.get("/news/{symbol}", response_model=List[schemas.NewsArticle])
