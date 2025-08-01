@@ -1,5 +1,5 @@
 # backend/app/schemas.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 from datetime import datetime, date
 from typing import Optional, List
 
@@ -33,3 +33,15 @@ class HoldingXIRR(BaseModel):
     symbol: str
     xirr_percent: Optional[float] = None
     message: Optional[str] = None
+
+# --- New Schema for News ---
+class NewsArticle(BaseModel):
+    uuid: str
+    title: str
+    publisher: str
+    link: HttpUrl
+    provider_publish_time: datetime
+    type: str
+
+    class Config:
+        orm_mode = True
