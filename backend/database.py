@@ -2,7 +2,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from .config import logger
+from config import logger
 
 # --- Database Configuration ---
 # We use SQLite here for its simplicity. The database file will be created in the backend directory.

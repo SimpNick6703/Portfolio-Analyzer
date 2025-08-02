@@ -2,8 +2,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 import pandas as pd
-from . import models
-from .config import logger
+import models
+from config import logger
 from datetime import date
 
 # --- Trade Functions ---

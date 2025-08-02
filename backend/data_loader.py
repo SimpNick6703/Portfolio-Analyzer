@@ -1,7 +1,7 @@
 # backend/app/data_loader.py
 import pandas as pd
 from typing import List
-from .config import logger
+from config import logger
 
 def load_and_clean_trades(file_paths: List[str]) -> pd.DataFrame:
     """

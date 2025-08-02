@@ -3,8 +3,8 @@ import yfinance as yf
 import time
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
-from . import crud, models
-from .config import logger
+import crud, models
+from config import logger
 
 # Fetches stock splits and stores them in the database.
 def fetch_and_store_splits(db: Session, symbol: str):

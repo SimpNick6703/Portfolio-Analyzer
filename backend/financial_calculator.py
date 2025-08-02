@@ -3,8 +3,8 @@ import pandas as pd
 import numpy_financial as npf
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
-from . import models
-from .config import logger
+import models
+from config import logger
 
 def get_daily_portfolio_value(db: Session, target_currency: str = 'USD') -> pd.DataFrame:
     """

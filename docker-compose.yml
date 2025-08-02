@@ -7,15 +7,15 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app # Mounts the local code into the container
-      - portfolio_db_data:/app/data/db # Persists the database
+      - ./backend:/app
+      - portfolio_db_data:/app
 
   frontend:
     build: ./frontend
     container_name: portfolio_frontend
     restart: unless-stopped
     ports:
-      - "3000:80" # Map host port 3000 to container port 80 (Nginx)
+      - "3000:80"
     depends_on:
       - backend
 
