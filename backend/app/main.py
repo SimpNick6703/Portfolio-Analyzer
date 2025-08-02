@@ -5,12 +5,12 @@ from typing import List, AsyncGenerator
 from contextlib import asynccontextmanager
 import yfinance as yf
 
-from .app import crud, models, schemas
-from .app.database import engine, get_db, SessionLocal
-from .app.config import logger, TRADE_FILES
-from .app.data_loader import load_and_clean_trades
-from .app.data_enricher import run_full_enrichment
-from .app.financial_calculator import get_daily_portfolio_value, calculate_xirr_for_holding, get_current_holdings
+from app import crud, models, schemas
+from app.database import engine, get_db, SessionLocal
+from app.config import logger, TRADE_FILES
+from app.data_loader import load_and_clean_trades
+from app.data_enricher import run_full_enrichment
+from app.financial_calculator import get_daily_portfolio_value, calculate_xirr_for_holding, get_current_holdings
 
 models.Base.metadata.create_all(bind=engine)
 

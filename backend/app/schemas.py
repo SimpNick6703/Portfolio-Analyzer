@@ -1,10 +1,14 @@
 # backend/app/schemas.py
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, ConfigDict
 from datetime import datetime, date
 from typing import Optional, List
 
 # --- Base Schemas ---
 class TradeSchema(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+    )
     id: int
     asset_category: str = Field(..., alias='Asset Category')
     currency: str = Field(..., alias='Currency')
@@ -20,11 +24,8 @@ class TradeSchema(BaseModel):
     mtm_pl: Optional[float] = Field(None, alias='MTM P/L')
     code: Optional[str] = Field(None, alias='Code')
 
-    class Config:
-        orm_mode = True  # Allows the model to be created from an ORM object
-        allow_population_by_field_name = True
 
-# --- New Schemas for Analytics ---
+# --- Schemas for Analytics ---
 class DailyValue(BaseModel):
     Date: date
     PortfolioValue: float
@@ -34,14 +35,19 @@ class HoldingXIRR(BaseModel):
     xirr_percent: Optional[float] = None
     message: Optional[str] = None
 
-# --- New Schema for News ---
+class Holding(BaseModel):
+    symbol: str
+    quantity: float
+    market_value: float
+    xirr_percent: Optional[float]
+
+# --- Schema for News ---
 class NewsArticle(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     uuid: str
     title: str
     publisher: str
     link: HttpUrl
     provider_publish_time: datetime
-    type: str
-
-    class Config:
-        orm_mode = True
+    # FIX: Renamed 'type' to 'article_type' and added an alias.
+    article_type: str = Field(..., alias='type')
