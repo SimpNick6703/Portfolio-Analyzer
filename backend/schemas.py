@@ -9,7 +9,7 @@ class TradeSchema(BaseModel):
         from_attributes=True,
         populate_by_name=True,
     )
-    id: int
+    trade_id: int
     asset_category: str = Field(..., alias='Asset Category')
     currency: str = Field(..., alias='Currency')
     symbol: str = Field(..., alias='Symbol')
@@ -49,5 +49,4 @@ class NewsArticle(BaseModel):
     publisher: str
     link: HttpUrl
     provider_publish_time: datetime
-    # FIX: Renamed 'type' to 'article_type' and added an alias.
     article_type: str = Field(..., alias='type')
