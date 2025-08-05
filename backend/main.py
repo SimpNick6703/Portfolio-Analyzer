@@ -5,10 +5,7 @@ from typing import List, AsyncGenerator
 from contextlib import asynccontextmanager
 import yfinance as yf
 
-# Simplified Imports
-import crud
-import models
-import schemas
+import crud, models, schemas
 from database import engine, get_db, SessionLocal
 from config import logger, TRADE_FILES
 from data_loader import load_and_clean_trades
@@ -28,7 +25,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 crud.populate_database(db, trades_df)
         else:
             logger.info("Trade data already exists in DB.")
-
         logger.info("Starting data enrichment process...")
         run_full_enrichment(db)
         logger.info("Data enrichment process complete.")
@@ -41,15 +37,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(title="Portfolio Analyzer API", lifespan=lifespan)
 
-# --- API Endpoints ---
 @app.get("/")
-def read_root(db: Session = Depends(get_db)):
-    trade_count = crud.get_trade_count(db)
-    return {"message": "Welcome!", "total_trades_in_db": trade_count}
-
-@app.get("/trades", response_model=List[schemas.TradeSchema])
-def get_all_trades(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
-    return db.query(models.Trade).order_by(models.Trade.datetime).offset(skip).limit(limit).all()
+def read_root():
+    return {"message": "Welcome to the Portfolio Analyzer API"}
 
 @app.get("/analytics/holdings", response_model=List[schemas.Holding])
 def get_holdings_list(db: Session = Depends(get_db)):

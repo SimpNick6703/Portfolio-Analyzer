@@ -1,31 +1,25 @@
-# backend/app/schemas.py
+# backend/schemas.py
 from pydantic import BaseModel, Field, HttpUrl, ConfigDict
 from datetime import datetime, date
 from typing import Optional, List
 
-# --- Base Schemas ---
 class TradeSchema(BaseModel):
-    model_config = ConfigDict(
-        from_attributes=True,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     trade_id: int
-    asset_category: str = Field(..., alias='Asset Category')
-    currency: str = Field(..., alias='Currency')
-    symbol: str = Field(..., alias='Symbol')
-    datetime: datetime = Field(..., alias='Date/Time') # type: ignore
-    quantity: float = Field(..., alias='Quantity')
-    t_price: float = Field(..., alias='T. Price')
+    asset_category: str = Field(alias='Asset Category')
+    currency: str = Field(alias='Currency')
+    symbol: str = Field(alias='Symbol')
+    trade_datetime: datetime = Field(alias='Date/Time')
+    quantity: float = Field(alias='Quantity')
+    t_price: float = Field(alias='T. Price')
     c_price: Optional[float] = Field(None, alias='C. Price')
     proceeds: Optional[float] = Field(None, alias='Proceeds')
     comm_fee: Optional[float] = Field(None, alias='Comm/Fee')
-    basis: Optional[float] = Field(None, alias='Basis')
+    cost_basis: Optional[float] = Field(None, alias='Basis')
     realized_pl: Optional[float] = Field(None, alias='Realized P/L')
     mtm_pl: Optional[float] = Field(None, alias='MTM P/L')
-    code: Optional[str] = Field(None, alias='Code')
+    trade_code: Optional[str] = Field(None, alias='Code')
 
-
-# --- Schemas for Analytics ---
 class DailyValue(BaseModel):
     Date: date
     PortfolioValue: float
@@ -41,7 +35,6 @@ class Holding(BaseModel):
     market_value: float
     xirr_percent: Optional[float]
 
-# --- Schema for News ---
 class NewsArticle(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     uuid: str
@@ -49,4 +42,4 @@ class NewsArticle(BaseModel):
     publisher: str
     link: HttpUrl
     provider_publish_time: datetime
-    article_type: str = Field(..., alias='type')
+    article_type: str = Field(alias='type')

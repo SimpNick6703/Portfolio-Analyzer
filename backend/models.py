@@ -1,12 +1,11 @@
-# backend/app/models.py
-from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Boolean, ForeignKey
-from sqlalchemy.orm import relationship
-from .database import Base
+# backend/models.py
+from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Boolean
+from database import Base
 
 class Trade(Base):
     __tablename__ = "trades"
 
-    id = Column(Integer, primary_key=True, index=True)
+    trade_id = Column(Integer, primary_key=True, index=True)
     asset_category = Column(String, name="Asset Category")
     currency = Column(String, name="Currency")
     symbol = Column(String, name="Symbol", index=True)
@@ -16,17 +15,14 @@ class Trade(Base):
     c_price = Column(Float, name="C. Price")
     proceeds = Column(Float, name="Proceeds")
     comm_fee = Column(Float, name="Comm/Fee")
-    basis = Column(Float, name="Basis")
+    cost_basis = Column(Float, name="Basis")
     realized_pl = Column(Float, name="Realized P/L")
     mtm_pl = Column(Float, name="MTM P/L")
-    code = Column(String, name="Code")
-    
-    # New column to prevent re-applying splits
+    trade_code = Column(String, name="Code")
     is_split_adjusted = Column(Boolean, default=False, nullable=False)
 
 class StockSplit(Base):
     __tablename__ = "stock_splits"
-
     id = Column(Integer, primary_key=True, index=True)
     symbol = Column(String, index=True)
     date = Column(Date, index=True)
@@ -34,7 +30,6 @@ class StockSplit(Base):
 
 class HistoricalPrice(Base):
     __tablename__ = "historical_prices"
-
     id = Column(Integer, primary_key=True, index=True)
     symbol = Column(String, index=True)
     date = Column(Date, index=True)
@@ -42,8 +37,7 @@ class HistoricalPrice(Base):
 
 class CurrencyRate(Base):
     __tablename__ = "currency_rates"
-
     id = Column(Integer, primary_key=True, index=True)
-    pair = Column(String, index=True) # e.g., "USDSGD=X"
+    pair = Column(String, index=True)
     date = Column(Date, index=True)
     rate = Column(Float)
