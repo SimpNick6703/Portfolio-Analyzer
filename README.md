@@ -44,7 +44,7 @@ This project is fully containerized, so you only need to have **Docker** and **D
     Open a terminal in the root directory of the project (`portfolio-analyzer/`) and run the following command:
 
     ```bash
-    docker-compose up --build
+    docker-compose up --build -d
     ```
 
 4.  **Access the Application:**
@@ -54,4 +54,4 @@ This project is fully containerized, so you only need to have **Docker** and **D
 
 5.  **Stopping the Application:**
     -   To stop the containers, press `Ctrl + C` in the terminal where Docker Compose is running.
-    -   To stop and remove the containers, you can run `docker-compose down`.
+    -   To stop and remove the containers, you can run `docker-compose down -v`.
