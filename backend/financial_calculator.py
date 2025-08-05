@@ -19,69 +19,110 @@ def get_daily_portfolio_value(db: Session, target_currency: str = 'USD') -> pd.D
     """
     logger.info(f"Calculating daily portfolio value in {target_currency}...")
     
-    # 1. Fetch all necessary data into pandas DataFrames for efficient processing
-    trades = pd.read_sql(db.query(models.Trade).statement, db.bind)
-    prices = pd.read_sql(db.query(models.HistoricalPrice).statement, db.bind)
-    rates = pd.read_sql(db.query(models.CurrencyRate).statement, db.bind)
+    try:
+        # Use SQLAlchemy queries instead of pandas read_sql to avoid connection leaks
+        trades = db.query(models.Trade).all()
+        if not trades:
+            logger.warning("No trades found, cannot calculate portfolio value.")
+            return pd.DataFrame(columns=['Date', 'PortfolioValue'])
 
-    if trades.empty:
-        logger.warning("No trades found, cannot calculate portfolio value.")
-        return pd.DataFrame(columns=['Date', 'PortfolioValue'])
+        prices = db.query(models.HistoricalPrice).all()
+        rates = db.query(models.CurrencyRate).all()
 
-    # 2. Prepare data for merging
-    trades['date'] = pd.to_datetime(trades['Date/Time']).dt.date
-    prices['date'] = pd.to_datetime(prices['date']).dt.date
-    rates['date'] = pd.to_datetime(rates['date']).dt.date
-    
-    # Pivot rates for easy lookup
-    rates_pivot = rates.pivot(index='date', columns='pair', values='rate').ffill()
+        # Convert to DataFrames for calculation
+        trades_data = []
+        for trade in trades:
+            trades_data.append({
+                'Symbol': trade.symbol,
+                'Currency': trade.currency,
+                'Date/Time': trade.datetime,
+                'Quantity': trade.quantity
+            })
+        trades_df = pd.DataFrame(trades_data)
 
-    # 3. Determine the full date range for the portfolio history
-    start_date = trades['date'].min()
-    end_date = date.today()
-    date_range = pd.to_datetime(pd.date_range(start=start_date, end=end_date)).date
-    
-    portfolio_values = []
-    
-    # 4. Iterate through each day in the portfolio's history
-    for current_date in date_range:
-        # Get all trades that happened up to and including the current day
-        past_trades = trades[trades['date'] <= current_date]
+        prices_data = []
+        for price in prices:
+            prices_data.append({
+                'Symbol': price.symbol,
+                'date': price.date,
+                'close_price': price.close_price
+            })
+        prices_df = pd.DataFrame(prices_data)
+
+        rates_data = []
+        for rate in rates:
+            rates_data.append({
+                'pair': rate.pair,
+                'date': rate.date,
+                'rate': rate.rate
+            })
+        rates_df = pd.DataFrame(rates_data)
+
+        # Handle empty data gracefully
+        if prices_df.empty:
+            logger.warning("No price data available, returning empty portfolio values")
+            return pd.DataFrame(columns=['Date', 'PortfolioValue'])
+
+        # 2. Prepare data for merging
+        trades_df['date'] = pd.to_datetime(trades_df['Date/Time']).dt.date
+        prices_df['date'] = pd.to_datetime(prices_df['date']).dt.date
+        if not rates_df.empty:
+            rates_df['date'] = pd.to_datetime(rates_df['date']).dt.date
+            # Pivot rates for easy lookup
+            rates_pivot = rates_df.pivot(index='date', columns='pair', values='rate').ffill()
+        else:
+            rates_pivot = pd.DataFrame()  # Empty rates for fallback
+
+        # 3. Determine the full date range for the portfolio history
+        start_date = trades_df['date'].min()
+        end_date = date.today()
+        date_range = pd.to_datetime(pd.date_range(start=start_date, end=end_date)).date
         
-        # Calculate current holdings by summing quantities for each symbol
-        holdings = past_trades.groupby('Symbol')['Quantity'].sum()
-        holdings = holdings[holdings > 0] # Filter out stocks that have been sold off
-
-        daily_value = 0.0
+        portfolio_values = []
         
-        # 5. Calculate the value of each holding
-        for symbol, quantity in holdings.items():
-            # Get the latest price for the symbol on or before the current date
-            latest_price_series = prices[(prices['Symbol'] == symbol) & (prices['date'] <= current_date)]
-            if latest_price_series.empty:
-                continue # No price data available for this date yet
+        # 4. Iterate through each day in the portfolio's history
+        for current_date in date_range:
+            # Get all trades that happened up to and including the current day
+            past_trades = trades_df[trades_df['date'] <= current_date]
+            
+            # Calculate current holdings by summing quantities for each symbol
+            holdings = past_trades.groupby('Symbol')['Quantity'].sum()
+            holdings = holdings[holdings > 0] # Filter out stocks that have been sold off
+
+            daily_value = 0.0
+            
+            # 5. Calculate the value of each holding
+            for symbol, quantity in holdings.items():
+                # Get the latest price for the symbol on or before the current date
+                latest_price_series = prices_df[(prices_df['Symbol'] == symbol) & (prices_df['date'] <= current_date)]
+                if latest_price_series.empty:
+                    continue # No price data available for this date yet
+                    
+                latest_price = latest_price_series.sort_values(by='date', ascending=False).iloc[0]
                 
-            latest_price = latest_price_series.sort_values(by='date', ascending=False).iloc[0]
-            
-            # Find the currency of the first trade for this symbol to determine its native currency
-            asset_currency = trades[trades['Symbol'] == symbol].iloc[0]['Currency']
-            
-            value_in_asset_currency = quantity * latest_price['close_price']
-            
-            # 6. Convert the holding's value to the target currency
-            value_in_target_currency = _convert_currency(
-                value_in_asset_currency,
-                asset_currency,
-                target_currency,
-                current_date,
-                rates_pivot
-            )
-            daily_value += value_in_target_currency
-            
-        portfolio_values.append({'Date': current_date, 'PortfolioValue': daily_value})
+                # Find the currency of the first trade for this symbol to determine its native currency
+                asset_currency = trades_df[trades_df['Symbol'] == symbol].iloc[0]['Currency']
+                
+                value_in_asset_currency = quantity * latest_price['close_price']
+                
+                # 6. Convert the holding's value to the target currency
+                value_in_target_currency = _convert_currency(
+                    value_in_asset_currency,
+                    asset_currency,
+                    target_currency,
+                    current_date,
+                    rates_pivot
+                )
+                daily_value += value_in_target_currency
+                
+            portfolio_values.append({'Date': current_date, 'PortfolioValue': daily_value})
 
-    logger.info("Finished calculating daily portfolio value.")
-    return pd.DataFrame(portfolio_values)
+        logger.info("Finished calculating daily portfolio value.")
+        return pd.DataFrame(portfolio_values)
+    
+    except Exception as e:
+        logger.error(f"Error calculating daily portfolio value: {e}")
+        return pd.DataFrame(columns=['Date', 'PortfolioValue'])
 
 
 def _convert_currency(amount: float, from_currency: str, to_currency: str, conv_date: date, rates_df: pd.DataFrame) -> float:
@@ -176,37 +217,74 @@ def get_current_holdings(db: Session) -> list:
     """
     logger.info("Calculating current holdings...")
     
-    # Using pandas for efficient calculation
-    trades_df = pd.read_sql(db.query(models.Trade).statement, db.bind)
-    prices_df = pd.read_sql(db.query(models.HistoricalPrice).statement, db.bind)
+    try:
+        # Use SQLAlchemy queries instead of pandas read_sql to avoid connection leaks
+        trades = db.query(models.Trade).all()
+        if not trades:
+            logger.info("No trades found in database")
+            return []
 
-    if trades_df.empty:
+        # Convert trades to DataFrame for calculation
+        trades_data = []
+        for trade in trades:
+            trades_data.append({
+                'Symbol': trade.symbol,
+                'Quantity': trade.quantity
+            })
+        trades_df = pd.DataFrame(trades_data)
+
+        # Get all historical prices
+        prices = db.query(models.HistoricalPrice).all()
+        prices_data = []
+        for price in prices:
+            prices_data.append({
+                'Symbol': price.symbol,
+                'date': price.date,
+                'close_price': price.close_price
+            })
+        prices_df = pd.DataFrame(prices_data)
+
+        if prices_df.empty:
+            logger.warning("No price data available for holdings calculation")
+            return []
+
+        # Get the latest price for each symbol
+        latest_prices = prices_df.loc[prices_df.groupby('Symbol')['date'].idxmax()]
+        latest_prices = latest_prices.set_index('Symbol')['close_price']
+        
+        # Calculate current quantities
+        current_quantities = trades_df.groupby('Symbol')['Quantity'].sum()
+        
+        # Filter for holdings we still own
+        holdings = current_quantities[current_quantities > 0].reset_index()
+        if holdings.empty:
+            logger.info("No current holdings found (all positions closed)")
+            return []
+            
+        holdings.rename(columns={'Quantity': 'quantity'}, inplace=True)
+        
+        # Map the latest price to each holding
+        holdings['market_value'] = holdings['Symbol'].map(latest_prices) * holdings['quantity']
+        holdings.fillna({'market_value': 0}, inplace=True) # Handle case where price might be missing
+        
+        # Fetch XIRR for each holding (with error handling)
+        def get_xirr_safe(symbol):
+            try:
+                xirr = calculate_xirr_for_holding(db, symbol)
+                return float(xirr) if xirr is not None else None
+            except Exception as e:
+                logger.warning(f"Failed to calculate XIRR for {symbol}: {e}")
+                return None
+
+        holdings['xirr_percent'] = holdings['Symbol'].apply(get_xirr_safe)
+
+        # Rename for consistency with schema
+        holdings.rename(columns={'Symbol': 'symbol'}, inplace=True)
+        
+        result = holdings.to_dict(orient='records')
+        logger.info(f"Successfully calculated holdings for {len(result)} symbols")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error calculating current holdings: {e}")
         return []
-
-    # Get the latest price for each symbol
-    latest_prices = prices_df.loc[prices_df.groupby('Symbol')['date'].idxmax()]
-    latest_prices = latest_prices.set_index('Symbol')['close_price']
-    
-    # Calculate current quantities
-    current_quantities = trades_df.groupby('Symbol')['Quantity'].sum()
-    
-    # Filter for holdings we still own
-    holdings = current_quantities[current_quantities > 0].reset_index()
-    holdings.rename(columns={'Quantity': 'quantity'}, inplace=True)
-    
-    # Map the latest price to each holding
-    holdings['market_value'] = holdings['Symbol'].map(latest_prices) * holdings['quantity']
-    holdings.fillna({'market_value': 0}, inplace=True) # Handle case where price might be missing
-    
-    # Fetch XIRR for each holding
-    def get_xirr(symbol):
-        xirr = calculate_xirr_for_holding(db, symbol)
-        # Ensure we return a JSON-serializable float or None
-        return float(xirr) if xirr is not None else None
-
-    holdings['xirr_percent'] = holdings['Symbol'].apply(get_xirr)
-
-    # Rename for consistency with schema
-    holdings.rename(columns={'Symbol': 'symbol'}, inplace=True)
-    
-    return holdings.to_dict(orient='records')
