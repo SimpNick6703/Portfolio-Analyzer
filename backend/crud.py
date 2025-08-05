@@ -24,7 +24,12 @@ def populate_database(db: Session, trades_df: pd.DataFrame):
         logger.info("Database already contains trade data. Skipping population.")
         return
     logger.info("Database is empty. Populating with new trade data...")
-    df_renamed = trades_df.rename(columns={
+    
+    # Add auto-incrementing trade_id starting from 1
+    trades_df_copy = trades_df.copy()
+    trades_df_copy['trade_id'] = range(1, len(trades_df_copy) + 1)
+    
+    df_renamed = trades_df_copy.rename(columns={
         "Asset Category": "asset_category", "Currency": "currency", "Symbol": "symbol",
         "Date/Time": "datetime", "Quantity": "quantity", "T. Price": "t_price",
         "C. Price": "c_price", "Proceeds": "proceeds", "Comm/Fee": "comm_fee",

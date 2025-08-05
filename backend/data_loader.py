@@ -26,9 +26,17 @@ def load_and_clean_trades(file_paths: List[str]) -> pd.DataFrame:
             df = pd.read_csv(file_path, on_bad_lines='skip')
             
             # 1. Filter for rows that contain actual trade data
-            df = df[df['DataDiscriminator'] == 'Data'].copy()
+            df = df[df['DataDiscriminator'] == 'Order'].copy()
 
-            # 2. Clean and convert data types
+            # 2. Keep only the relevant columns (exclude metadata columns)
+            relevant_columns = [
+                'Asset Category', 'Currency', 'Symbol', 'Date/Time', 'Quantity', 
+                'T. Price', 'C. Price', 'Proceeds', 'Comm/Fee', 'Basis', 
+                'Realized P/L', 'MTM P/L', 'Code'
+            ]
+            df = df[relevant_columns].copy()
+
+            # 3. Clean and convert data types
             # Convert 'Quantity' from string (e.g., "2,500") to numeric
             df['Quantity'] = df['Quantity'].astype(str).str.replace(',', '', regex=False)
             df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
